@@ -143,17 +143,19 @@ performance_test(int* dfa, int* fail_state, char* tweets, bool* valid_state, int
 	cout<<"running performance tests"<<endl;
 	// serial performance
 	struct timeval start, end;
-	float serial_time, parallel_time;
+	float serial_time, parallel_time, parallel_time2;
 	fflush(stdout);
 	gettimeofday(&start, NULL);
 	profanity_filter_serial(dfa, fail_state, tweets, valid_state, num_tweets);
+	profanity_filter_acc_parallel(dfa, fail_state, tweets, valid_state, num_tweets);
 	gettimeofday(&end, NULL);
 	serial_time = ms_difference(start, end);
 	// for(int i=0; i< num_tweets; i++) {
-	// 	cout<<valid_state[i]<<",";
+	//  	cout<<valid_state[i]<<",";
 	// }
 	printf("Your serial code ran in: %f msecs.\n", serial_time);
-	// memset(valid_state, false, sizeof(valid_state));
+	
+	memset(valid_state, false, sizeof(valid_state));
 	// fflush(stdout);
 	// gettimeofday(&start, NULL);
 	// profanity_filter_parallel(dfa, fail_state, tweets, valid_state, num_tweets);
@@ -163,6 +165,20 @@ performance_test(int* dfa, int* fail_state, char* tweets, bool* valid_state, int
 	// 	cout<<valid_state[i]<<",";
 	// }
 	// printf("Your parallel code ran in: %f msecs.\n", parallel_time);
+	
+	
+	fflush(stdout);
+	gettimeofday(&start, NULL);
+	profanity_filter_acc_parallel(dfa, fail_state, tweets, valid_state, num_tweets);
+	gettimeofday(&end, NULL);
+	parallel_time2 = ms_difference(start, end);
+
+	// for(int i=0; i< num_tweets; i++) {
+	//  	cout<<valid_state[i]<<",";
+	// }
+
+	printf("Your Open ACC parallel code ran in: %f msecs.\n", parallel_time2);
+
 
 }
 
