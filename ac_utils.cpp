@@ -31,6 +31,8 @@ generate_DFA(int* dfa, string output[], vector<string> input) {
 		int curr_state = 0;
 		for(char& ch : str) {
 			int st = get_state_as_int(ch);
+			if(st < 0 || st>=30)
+				continue;
 			if(dfa[curr_state*NUM_COLS + st] != 0) {
 				curr_state = dfa[curr_state*NUM_COLS + st];
 			}

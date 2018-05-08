@@ -5,8 +5,9 @@
 
 using namespace std;
 
-const int NUM_ROWS = 6000;
+const int NUM_ROWS = 5001;
 const int NUM_COLS = 30;
+const int TWEET_CHUNK = 5;
 
 void generate_DFA(int* dfa, string output[], vector<string> input);
 void generate_fail_states(int* dfa, int output[], int fail_state[]);
