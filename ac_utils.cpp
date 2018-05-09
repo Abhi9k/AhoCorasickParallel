@@ -85,9 +85,6 @@ generate_fail_states(int* dfa, string output[], int fail_state[]) {
 			}
 
 			fail_state[a] = dfa[st*NUM_COLS + i];
-
-
-			// TODO: append to output
 		}
 	}
 }

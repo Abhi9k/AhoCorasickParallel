@@ -16,7 +16,7 @@ def generate_records_of_length(length, file_name):
 
 
 def create_const_number_of_tweets():
-	fs = ['500', '600', '700','800']
+	fs = ['100', '200', '300', '400', '500', '600', '700','800']
 	for s in fs:
 		lines = open("tweets_big_"+s, 'r').readlines()
 		deficit = 1000000 - len(lines)

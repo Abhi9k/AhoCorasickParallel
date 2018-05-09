@@ -32,10 +32,6 @@ print_usage() {
 std::vector<std::string>
 load_input_file(const char* filename, int* n, int num_words_to_load) {
 	fstream in;
-	// if((in = fopen(filename, "r")) == 0) {
-	// 	fprintf(stderr, "Error, could not open file '%s'.\n", filename);
-	// 	abort();
-	// }
 	in.open(filename, fstream::in);
 
 	vector<string> word_list;
@@ -142,45 +138,46 @@ print_fail_states(int fail_state[], int num_states) {
 
 void
 performance_test(int* dfa, int* fail_state, char* tweets, bool* valid_state, int num_tweets, int tweet_length, int num_of_words) {
-	// cout<<"running performance tests"<<endl;
 	GpuTimer timer;
-	// fflush(stdout);
-	// timer.Start();
-	// profanity_filter_serial(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length);
-	// timer.Stop();
-	// // printf("Your serial code ran in: %f msecs.\n", timer.Elapsed());
-	// printf("%f", timer.Elapsed());
-	// cout<<endl;
-	// for(int i=90000; i< 90100; i++) {
-	// 	cout<<valid_state[i]<<",";
-	// }
-	// cout<<endl<<endl;
-
-	// memset(valid_state, false, num_tweets*sizeof(bool));
+	fflush(stdout);
+	timer.Start();
+	cout<<"SERIAL"<<","<<num_tweets<<","<<tweet_length<<","<<num_of_words<<",";
+	profanity_filter_serial(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length);
+	timer.Stop();
+	printf("%f\n", timer.Elapsed());
+	memset(valid_state, false, num_tweets*sizeof(bool));
 	fflush(stdout);
 
+
 	timer.Start();
-	profanity_filter_parallel(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length);
+	cout<<"CUDA"<<","<<num_tweets<<","<<tweet_length<<","<<num_of_words<<",";
+	profanity_filter_parallel(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length, 1024, 256);
 	timer.Stop();
-	// printf("Your parallel code ran in: %f msecs.\n", timer.Elapsed());
-	printf("%f", timer.Elapsed());
-	// cout<<endl;
-	// for(int i=90000; i< 90100; i++) {
-	// 	cout<<valid_state[i]<<",";
-	// }
+	printf("%f\n", timer.Elapsed());
 
 	fflush(stdout);
 	timer.Start();
-	profanity_filter_acc_parallel(dfa, fail_state, tweets, valid_state, num_tweets);
+	cout<<"OpenACC"<<","<<num_tweets<<","<<tweet_length<<","<<num_of_words<<",";
+	profanity_filter_acc_parallel(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length);
 	timer.Stop();
-	// printf("Your parallel code ran in: %f msecs.\n", timer.Elapsed());
+	printf("%f\n", timer.Elapsed());
+
+}
+
+void
+cuda_optimal_space_search(int* dfa, int* fail_state, char* tweets, bool* valid_state, int num_tweets, int tweet_length, int num_of_words, int num_threads, int num_blocks) {
+	GpuTimer timer;
+	fflush(stdout);
+	timer.Start();
+	profanity_filter_parallel(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length, num_threads, num_blocks);
+	timer.Stop();
 	printf("%f", timer.Elapsed());
 
 }
 
 int main(int argc, char **argv) {
 
-	bool lflag=false, tflag=false, pflag=false;
+	bool lflag=false, tflag=false, sflag=false;
 	int num_of_words;
 	int c;
 	int* fail_state;
@@ -192,7 +189,7 @@ int main(int argc, char **argv) {
 	int num_tweets;
 	int num_words_to_load;
 
-	while((c = getopt(argc, argv, "l:tp?")) != -1) {
+	while((c = getopt(argc, argv, "l:ts?")) != -1) {
 		switch(c) {
 			case 'l':
 				lflag = true;
@@ -203,8 +200,8 @@ int main(int argc, char **argv) {
 				tflag = true;
 				break;
 
-			case 'p':
-				pflag = true;
+			case 's':
+				sflag = true;
 				break;
 
 			case '?':
@@ -223,14 +220,46 @@ int main(int argc, char **argv) {
 		exit(0);
 	}
 
+	if(sflag) {
+		for(int num_blocks=64; num_blocks<=256; num_blocks+=32) {
+			for(int num_threads=128; num_threads<=1024; num_threads+= 64) {
+				num_tweets = 1000000;
+				tweet_length = 800;
+				num_words_to_load = 800;
+				vector<string> word_list;
+				string output[num_rows];
+				fail_state = (int *) malloc(num_rows*sizeof(int));
+				dfa = (int *) malloc(num_rows*num_cols*sizeof(int));
 
+				memset(dfa, 0, sizeof(int) * num_rows * num_cols);
+				memset(fail_state, 0, sizeof(fail_state));
 
+				word_list = load_input_file(input_filename, &num_of_words, num_words_to_load);
+
+				generate_DFA(dfa, output, word_list);
+				generate_fail_states(dfa, output, fail_state);
+
+				valid_state = (bool *) malloc(num_tweets * sizeof(bool));
+
+				tweets = load_tweets("data/tweets_big_800", num_tweets, tweet_length);
+
+				memset(valid_state, false, sizeof(valid_state));
+				cout<<num_tweets<<","<<tweet_length<<","<<num_words_to_load<<","<<num_blocks<<","<<num_threads<<",";
+				cuda_optimal_space_search(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length, num_words_to_load, num_threads, num_blocks);
+				cout<<endl;
+				free(dfa);
+				free(fail_state);
+				free(tweets);
+				free(valid_state);
+			}
+		}
+
+		exit(1);
+	}
+	cout<<"Type"<<","<<"# of records"<<","<<"# of characters in each record"<<","<<"# of patterns"<<","<<"Runtime (in ms)"<<endl;
 	for( num_tweets=100000; num_tweets<=1000000; num_tweets+=100000) {
 		for(tweet_length=100; tweet_length<=800; tweet_length+=100) {
 			for(num_words_to_load=200; num_words_to_load<=800; num_words_to_load+=200) {
-				// num_tweets = 1000000;
-				// tweet_length = 800;
-				// num_words_to_load = 500;
 				vector<string> word_list;
 				string output[num_rows];
 				fail_state = (int *) malloc(num_rows*sizeof(int));
@@ -272,15 +301,10 @@ int main(int argc, char **argv) {
 					tweets = load_tweets("data/tweets_big_700", num_tweets, tweet_length);
 				if(tweet_length == 800)
 					tweets = load_tweets("data/tweets_big_800", num_tweets, tweet_length);
-				// for(int i=0; i<1000; i++){
-				// 	cout<<tweets[i];
-				// }
 
 				memset(valid_state, false, sizeof(valid_state));
 
-				cout<<num_tweets<<","<<tweet_length<<","<<num_words_to_load<<",";
 				performance_test(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length, num_words_to_load);
-				cout<<endl;
 
 				free(dfa);
 				free(fail_state);
@@ -289,64 +313,6 @@ int main(int argc, char **argv) {
 			}
 		}
 	}
-
-	// num_tweets = 1000000;
-	// vector<string> word_list;
-	// string output[num_rows];
-	// fail_state = (int *) malloc(num_rows*sizeof(int));
-	// int num_words_to_load = 5000;
-	// tweet_length =500;
-	// dfa = (int *) malloc(num_rows*num_cols*sizeof(int));
-
-	// memset(dfa, 0, sizeof(int) * num_rows * num_cols);
-	// memset(fail_state, 0, sizeof(fail_state));
-
-	// word_list = load_input_file(input_filename, &num_of_words, num_words_to_load);
-
-	// //print_word_list(word_list, 2, num_of_words);
-
-	// generate_DFA(dfa, output, word_list);
-
-	// //print_dfa(dfa, 100, num_cols);
-
-	// generate_fail_states(dfa, output, fail_state);
-
-	// //print_state_outputs(dfa, output, num_rows);
-
-	// //print_fail_states(fail_state, num_cols);
-
-
-	// valid_state = (bool *) malloc(num_tweets * sizeof(bool));
-
-	// if(tweet_length == 100)
-	// 	tweets = load_tweets("data/tweets_big_100", num_tweets, tweet_length);
-	// if(tweet_length == 200)
-	// 	tweets = load_tweets("data/tweets_big_200", num_tweets, tweet_length);
-	// if(tweet_length == 300)
-	// 	tweets = load_tweets("data/tweets_big_300", num_tweets, tweet_length);
-	// if(tweet_length == 400)
-	// 	tweets = load_tweets("data/tweets_big_400", num_tweets, tweet_length);
-	// if(tweet_length == 500)
-	// 	tweets = load_tweets("data/tweets_big_500", num_tweets, tweet_length);
-	// if(tweet_length == 600)
-	// 	tweets = load_tweets("data/tweets_big_600", num_tweets, tweet_length);
-	// if(tweet_length == 700)
-	// 	tweets = load_tweets("data/tweets_big_700", num_tweets, tweet_length);
-	// if(tweet_length == 800)
-	// 	tweets = load_tweets("data/tweets_big_800", num_tweets, tweet_length);
-	// // for(int i=0; i<1000; i++){
-	// // 	cout<<tweets[i];
-	// // }
-
-	// memset(valid_state, false, sizeof(valid_state));
-
-
-	// performance_test(dfa, fail_state, tweets, valid_state, num_tweets, tweet_length, num_words_to_load);
-
-	// free(dfa);
-	// free(fail_state);
-	// free(tweets);
-	// free(valid_state);
 
 	return 1;
 }
