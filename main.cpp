@@ -221,6 +221,7 @@ int main(int argc, char **argv) {
 	}
 
 	if(sflag) {
+		cout<<"# of records"<<","<<"# of characters in each record"<<","<<"# of patterns"<<","<<"Block size"<<","<<"# of threads"<<","<<"Runtime (in ms)"<<endl;
 		for(int num_blocks=64; num_blocks<=256; num_blocks+=32) {
 			for(int num_threads=128; num_threads<=1024; num_threads+= 64) {
 				num_tweets = 1000000;
